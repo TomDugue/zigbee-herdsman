@@ -1451,12 +1451,18 @@ vi.mock("../../../src/adapter/z-stack/znp/znp", () => ({
     })),
 }));
 
-vi.mock("../../../src/utils/queue", () => ({
-    Queue: vi.fn(() => ({
-        execute: mockQueueExecute,
-        count: () => 1,
-    })),
-}));
+vi.mock("../../../src/utils/queue", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../../../src/utils/queue")>();
+
+    return {
+        Queue: vi.fn(() => ({
+            execute: mockQueueExecute,
+            count: () => 1,
+        })),
+        QueueJobSupersededError: actual.QueueJobSupersededError,
+        queueExecuteKey: actual.queueExecuteKey,
+    };
+});
 
 const mocksClear = [mockLogger.debug, mockLogger.info, mockLogger.warning, mockLogger.error];
 

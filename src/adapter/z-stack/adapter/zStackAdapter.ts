@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import debounce from "debounce";
 import type * as Models from "../../../models";
-import {Queue, Waitress, wait} from "../../../utils";
+import {Queue, queueExecuteKey, Waitress, wait} from "../../../utils";
 import {logger} from "../../../utils/logger";
 import * as ZSpec from "../../../zspec";
 import type {BroadcastAddress} from "../../../zspec/enums";
@@ -467,25 +467,28 @@ export class ZStackAdapter extends Adapter {
     ): Promise<Events.ZclPayload | undefined> {
         const srcEndpoint = this.selectSourceEndpoint(sourceEndpoint, profileId);
 
-        return await this.queue.execute<Events.ZclPayload | undefined>(async () => {
-            this.checkInterpanLock();
-            return await this.sendZclFrameToEndpointInternal(
-                ieeeAddr,
-                networkAddress,
-                endpoint,
-                srcEndpoint,
-                zclFrame,
-                timeout,
-                disableResponse,
-                disableRecovery,
-                0,
-                0,
-                false,
-                false,
-                false,
-                undefined,
-            );
-        }, networkAddress);
+        return await this.queue.execute<Events.ZclPayload | undefined>(
+            async () => {
+                this.checkInterpanLock();
+                return await this.sendZclFrameToEndpointInternal(
+                    ieeeAddr,
+                    networkAddress,
+                    endpoint,
+                    srcEndpoint,
+                    zclFrame,
+                    timeout,
+                    disableResponse,
+                    disableRecovery,
+                    0,
+                    0,
+                    false,
+                    false,
+                    false,
+                    undefined,
+                );
+            },
+            queueExecuteKey(networkAddress, endpoint, zclFrame.streamType),
+        );
     }
 
     private async sendZclFrameToEndpointInternal(

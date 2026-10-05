@@ -1,5 +1,6 @@
 import assert from "node:assert";
 import type {Events as AdapterEvents} from "../../adapter";
+import {QueueJobSupersededError} from "../../utils";
 import {logger} from "../../utils/logger";
 import * as ZSpec from "../../zspec";
 import {BroadcastAddress} from "../../zspec/enums";
@@ -56,6 +57,7 @@ interface Options {
     disableRecovery?: boolean;
     writeUndiv?: boolean;
     sendPolicy?: SendPolicy;
+    streamType?: Zcl.ZclStreamType | false;
 }
 
 interface OptionsWithDefaults extends Options {
@@ -1184,6 +1186,14 @@ export class Endpoint extends ZigbeeEntity {
             optionsWithDefaults.reservedBits,
         );
 
+        if (options?.streamType !== false) {
+            const streamType = options?.streamType ?? Zcl.Frame.detectStreamType(payload);
+
+            if (streamType) {
+                frame.streamType = streamType;
+            }
+        }
+
         const createLogMessage = (): string =>
             `ZCL command ${this.deviceIeeeAddress}/${this.ID} ` +
             `${cluster.name}.${command.name}(${JSON.stringify(logPayload ? logPayload : payload)}, ${JSON.stringify(optionsWithDefaults)})`;
@@ -1200,6 +1210,11 @@ export class Endpoint extends ZigbeeEntity {
                 return resultFrame;
             }
         } catch (error) {
+            if (error instanceof QueueJobSupersededError) {
+                logger.debug(() => `${createLogMessage()} superseded`, NS);
+                return undefined;
+            }
+
             const err = error as Error;
             err.message = `${createLogMessage()} failed (${err.message})`;
             // biome-ignore lint/style/noNonNullAssertion: ignored using `--suppress`

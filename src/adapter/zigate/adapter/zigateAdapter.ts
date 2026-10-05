@@ -1,7 +1,7 @@
 /* v8 ignore start */
 
 import type * as Models from "../../../models";
-import {Queue, Waitress, wait} from "../../../utils";
+import {Queue, queueExecuteKey, Waitress, wait} from "../../../utils";
 import {logger} from "../../../utils/logger";
 import * as ZSpec from "../../../zspec";
 import type {BroadcastAddress} from "../../../zspec/enums";
@@ -284,23 +284,26 @@ export class ZiGateAdapter extends Adapter {
         sourceEndpoint?: number,
         profileId?: number,
     ): Promise<Events.ZclPayload | undefined> {
-        return await this.queue.execute<Events.ZclPayload | undefined>(async () => {
-            return await this.sendZclFrameToEndpointInternal(
-                ieeeAddr,
-                networkAddress,
-                endpoint,
-                sourceEndpoint || 1,
-                zclFrame,
-                timeout,
-                disableResponse,
-                disableRecovery,
-                0,
-                0,
-                false,
-                false,
-                profileId,
-            );
-        }, networkAddress);
+        return await this.queue.execute<Events.ZclPayload | undefined>(
+            async () => {
+                return await this.sendZclFrameToEndpointInternal(
+                    ieeeAddr,
+                    networkAddress,
+                    endpoint,
+                    sourceEndpoint || 1,
+                    zclFrame,
+                    timeout,
+                    disableResponse,
+                    disableRecovery,
+                    0,
+                    0,
+                    false,
+                    false,
+                    profileId,
+                );
+            },
+            queueExecuteKey(networkAddress, endpoint, zclFrame.streamType),
+        );
     }
 
     private async sendZclFrameToEndpointInternal(

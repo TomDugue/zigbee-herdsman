@@ -8,7 +8,7 @@ import type {ZigbeeAPSHeader, ZigbeeAPSPayload} from "zigbee-on-host/dist/zigbee
 import type {ZigbeeNWKGPHeader} from "zigbee-on-host/dist/zigbee/zigbee-nwkgp";
 import type {Backup} from "../../../models/backup";
 import {logger} from "../../../utils/logger";
-import {Queue} from "../../../utils/queue";
+import {Queue, queueExecuteKey} from "../../../utils/queue";
 import {wait} from "../../../utils/wait";
 import {Waitress} from "../../../utils/waitress";
 import * as ZSpec from "../../../zspec";
@@ -607,55 +607,59 @@ export class ZoHAdapter extends Adapter {
             commandResponseId = Zcl.Foundation.defaultRsp.ID;
         }
 
-        return await this.queue.execute<ZclPayload | undefined>(async () => {
-            this.checkInterpanLock();
+        return await this.queue.execute<ZclPayload | undefined>(
+            async () => {
+                this.checkInterpanLock();
 
-            logger.debug(
-                () => `~~~> [ZCL to=${ieeeAddr}:${networkAddress} clusterId=${zclFrame.cluster.ID} destEp=${endpoint} sourceEp=${sourceEndpoint}]`,
-                NS,
-            );
+                logger.debug(
+                    () =>
+                        `~~~> [ZCL to=${ieeeAddr}:${networkAddress} clusterId=${zclFrame.cluster.ID} destEp=${endpoint} sourceEp=${sourceEndpoint}]`,
+                    NS,
+                );
 
-            for (let i = 0; i < 2; i++) {
-                try {
-                    await this.driver.sendUnicast(
-                        zclFrame.toBuffer(),
-                        profileId ??
-                            (sourceEndpoint === ZSpec.GP_ENDPOINT && endpoint === ZSpec.GP_ENDPOINT ? ZSpec.GP_PROFILE_ID : ZSpec.HA_PROFILE_ID),
-                        zclFrame.cluster.ID,
-                        networkAddress, // nwkDest16
-                        undefined, // nwkDest64 XXX: avoid passing EUI64 whenever not absolutely necessary
-                        endpoint, // destEp
-                        sourceEndpoint ?? 1, // sourceEp
-                    );
+                for (let i = 0; i < 2; i++) {
+                    try {
+                        await this.driver.sendUnicast(
+                            zclFrame.toBuffer(),
+                            profileId ??
+                                (sourceEndpoint === ZSpec.GP_ENDPOINT && endpoint === ZSpec.GP_ENDPOINT ? ZSpec.GP_PROFILE_ID : ZSpec.HA_PROFILE_ID),
+                            zclFrame.cluster.ID,
+                            networkAddress, // nwkDest16
+                            undefined, // nwkDest64 XXX: avoid passing EUI64 whenever not absolutely necessary
+                            endpoint, // destEp
+                            sourceEndpoint ?? 1, // sourceEp
+                        );
 
-                    if (commandResponseId !== undefined) {
-                        const resp = await this.zclWaitress
-                            .waitFor(
-                                {
-                                    address: networkAddress,
-                                    clusterId: zclFrame.cluster.ID,
-                                    endpoint,
-                                    commandId: commandResponseId,
-                                    defaultRspCommandId: undefined,
-                                    transactionSequenceNumber: zclFrame.header.transactionSequenceNumber,
-                                },
-                                timeout,
-                            )
-                            .start().promise;
+                        if (commandResponseId !== undefined) {
+                            const resp = await this.zclWaitress
+                                .waitFor(
+                                    {
+                                        address: networkAddress,
+                                        clusterId: zclFrame.cluster.ID,
+                                        endpoint,
+                                        commandId: commandResponseId,
+                                        defaultRspCommandId: undefined,
+                                        transactionSequenceNumber: zclFrame.header.transactionSequenceNumber,
+                                    },
+                                    timeout,
+                                )
+                                .start().promise;
 
-                        return resp;
+                            return resp;
+                        }
+
+                        return;
+                    } catch (error) {
+                        if (disableRecovery || i === 1) {
+                            throw error;
+                        } // else retry
                     }
-
-                    return;
-                } catch (error) {
-                    if (disableRecovery || i === 1) {
-                        throw error;
-                    } // else retry
-                }
-                /* v8 ignore start */
-            } // coverage detection failure
-            /* v8 ignore stop */
-        });
+                    /* v8 ignore start */
+                } // coverage detection failure
+                /* v8 ignore stop */
+            },
+            queueExecuteKey(networkAddress, endpoint, zclFrame.streamType, null),
+        );
     }
 
     public async sendZclFrameToGroup(groupID: number, zclFrame: Zcl.Frame, sourceEndpoint?: number, profileId?: number): Promise<void> {

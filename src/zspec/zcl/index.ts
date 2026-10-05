@@ -6,6 +6,7 @@ export {Foundation} from "./definition/foundation";
 export {ManufacturerCode} from "./definition/manufacturerCode";
 export {Status} from "./definition/status";
 export * as Utils from "./utils";
+export type {ZclStreamType} from "./zclFrame";
 export {ZclFrame as Frame} from "./zclFrame";
 export {ZclHeader as Header} from "./zclHeader";
 export {ZclStatusError as StatusError} from "./zclStatusError";

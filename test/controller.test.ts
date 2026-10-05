@@ -14,6 +14,7 @@ import type {TCustomCluster} from "../src/controller/tstype";
 import type * as Models from "../src/models";
 import * as Utils from "../src/utils";
 import {setLogger} from "../src/utils/logger";
+import {QueueJobSupersededError} from "../src/utils/queue";
 import * as timeService from "../src/utils/timeService";
 import * as ZSpec from "../src/zspec";
 import {BroadcastAddress} from "../src/zspec/enums";
@@ -5703,6 +5704,49 @@ describe("Controller", () => {
         expect(mocksendZclFrameToEndpoint.mock.calls[0][5]).toBe(false);
         expect(mocksendZclFrameToEndpoint.mock.calls[0][6]).toBe(false);
         expect(mocksendZclFrameToEndpoint.mock.calls[0][7]).toBeUndefined();
+    });
+
+    it("Endpoint command marks color stream frames", async () => {
+        await controller.start();
+        await mockAdapterEvents.deviceJoined({networkAddress: 129, ieeeAddr: "0x129"});
+        const device = controller.getDeviceByIeeeAddr("0x129")!;
+        const endpoint = device.getEndpoint(1)!;
+        mocksendZclFrameToEndpoint.mockClear();
+        await endpoint.command("lightingColorCtrl", "moveToColor", {colorx: 100, colory: 200, transtime: 0});
+        expect(mocksendZclFrameToEndpoint.mock.calls[0][3].streamType).toBe("color");
+        expect(mocksendZclFrameToEndpoint.mock.calls[0][4]).toBe(10000);
+    });
+
+    it("Endpoint command marks brightness stream frames", async () => {
+        await controller.start();
+        await mockAdapterEvents.deviceJoined({networkAddress: 129, ieeeAddr: "0x129"});
+        const device = controller.getDeviceByIeeeAddr("0x129")!;
+        const endpoint = device.getEndpoint(1)!;
+        mocksendZclFrameToEndpoint.mockClear();
+        await endpoint.command("genLevelCtrl", "moveToLevel", {level: 128, transtime: 0});
+        expect(mocksendZclFrameToEndpoint.mock.calls[0][3].streamType).toBe("brightness");
+        expect(mocksendZclFrameToEndpoint.mock.calls[0][4]).toBe(10000);
+    });
+
+    it("Endpoint command streamType false disables marking", async () => {
+        await controller.start();
+        await mockAdapterEvents.deviceJoined({networkAddress: 129, ieeeAddr: "0x129"});
+        const device = controller.getDeviceByIeeeAddr("0x129")!;
+        const endpoint = device.getEndpoint(1)!;
+        mocksendZclFrameToEndpoint.mockClear();
+        await endpoint.command("lightingColorCtrl", "moveToColor", {colorx: 100, colory: 200, transtime: 0}, {streamType: false});
+        expect(mocksendZclFrameToEndpoint.mock.calls[0][3].streamType).toBeUndefined();
+    });
+
+    it("Endpoint command swallows superseded adapter queue errors", async () => {
+        await controller.start();
+        await mockAdapterEvents.deviceJoined({networkAddress: 129, ieeeAddr: "0x129"});
+        const device = controller.getDeviceByIeeeAddr("0x129")!;
+        const endpoint = device.getEndpoint(1)!;
+        mocksendZclFrameToEndpoint.mockClear();
+        mocksendZclFrameToEndpoint.mockRejectedValueOnce(new QueueJobSupersededError());
+        const result = await endpoint.command("lightingColorCtrl", "moveToColor", {colorx: 1, colory: 2, transtime: 0});
+        expect(result).toBeUndefined();
     });
 
     it("Endpoint command with duplicate cluster ID", async () => {

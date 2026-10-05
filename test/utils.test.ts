@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from "vitest";
 import {checkInstallCode} from "../src/controller/helpers/installCodes";
-import {Queue, Utils, Waitress, wait} from "../src/utils";
+import {Queue, QueueJobSupersededError, queueExecuteKey, Utils, Waitress, wait} from "../src/utils";
 import {AsyncMutex} from "../src/utils/async-mutex";
 import {logger, setLogger} from "../src/utils/logger";
 
@@ -226,6 +226,158 @@ describe("Utils", () => {
         queue.clear();
 
         expect(queue.count()).toBe(0);
+    });
+
+    it("Queue supersede replaces pending stream jobs while one is in flight", async () => {
+        const queue = new Queue(1);
+        const colors: string[] = [];
+        let releaseRed: (() => void) | undefined;
+        const redRunning = new Promise<void>((resolve) => {
+            releaseRed = (): void => resolve();
+        });
+
+        const stream = {key: 0x1234, supersedeKey: "1:color"};
+
+        const redPromise = queue.execute(async () => {
+            colors.push("red");
+            await redRunning;
+        }, stream);
+
+        const greenPromise = queue.execute(async () => {
+            await Promise.resolve();
+            colors.push("green");
+        }, stream);
+
+        const bluePromise = queue.execute(async () => {
+            await Promise.resolve();
+            colors.push("blue");
+        }, stream);
+
+        const yellowPromise = queue.execute(async () => {
+            await Promise.resolve();
+            colors.push("yellow");
+        }, stream);
+
+        await Promise.resolve();
+        expect(colors).toEqual(["red"]);
+
+        const greenError = await greenPromise.catch((error: unknown) => error);
+        const blueError = await bluePromise.catch((error: unknown) => error);
+        expect(greenError).toBeInstanceOf(QueueJobSupersededError);
+        expect(blueError).toBeInstanceOf(QueueJobSupersededError);
+
+        releaseRed?.();
+        await redPromise;
+        await yellowPromise;
+        expect(colors).toEqual(["red", "yellow"]);
+    });
+
+    it("Queue supersede is isolated per device network address", async () => {
+        const queue = new Queue(2);
+        const log: string[] = [];
+        let releaseA: (() => void) | undefined;
+        const deviceARunning = new Promise<void>((resolve) => {
+            releaseA = (): void => resolve();
+        });
+
+        const deviceAStream = {key: 0xaaaa, supersedeKey: "1:color"};
+        const deviceBStream = {key: 0xbbbb, supersedeKey: "1:color"};
+
+        const redA = queue.execute(async () => {
+            log.push("redA");
+            await deviceARunning;
+        }, deviceAStream);
+
+        const blueB = queue.execute(async () => {
+            await Promise.resolve();
+            log.push("blueB");
+        }, deviceBStream);
+
+        await Promise.resolve();
+        expect(log).toEqual(["redA", "blueB"]);
+
+        const greenA = queue.execute(async () => {
+            await Promise.resolve();
+            log.push("greenA");
+        }, deviceAStream);
+
+        await blueB;
+        releaseA?.();
+        await redA;
+        await greenA;
+        expect(log).toEqual(["redA", "blueB", "greenA"]);
+    });
+
+    it("Queue supersede color and brightness are independent", async () => {
+        const queue = new Queue(1);
+        const log: string[] = [];
+        let releaseColor: (() => void) | undefined;
+        const colorRunning = new Promise<void>((resolve) => {
+            releaseColor = (): void => resolve();
+        });
+
+        const colorPromise = queue.execute(
+            async () => {
+                log.push("color");
+                await colorRunning;
+            },
+            {key: 1, supersedeKey: "1:color"},
+        );
+
+        const brightnessPromise = queue.execute(
+            async () => {
+                await Promise.resolve();
+                log.push("brightness");
+            },
+            {key: 1, supersedeKey: "1:brightness"},
+        );
+
+        await Promise.resolve();
+        expect(log).toEqual(["color"]);
+
+        releaseColor?.();
+        await colorPromise;
+        await brightnessPromise;
+        expect(log).toEqual(["color", "brightness"]);
+    });
+
+    it("Queue supersede drops excess pending stream jobs", async () => {
+        const queue = new Queue(1);
+        let release: (() => void) | undefined;
+        const blocker = new Promise<void>((resolve) => {
+            release = (): void => resolve();
+        });
+
+        const stream = {key: 10, supersedeKey: "1:color"};
+
+        void queue.execute(async () => {
+            await blocker;
+        }, stream);
+
+        const promises: Promise<void>[] = [];
+
+        for (let i = 0; i < 100; i++) {
+            promises.push(
+                queue.execute(async () => {
+                    await Promise.resolve();
+                }, stream),
+            );
+        }
+
+        await Promise.resolve();
+        expect(queue.count()).toBe(2);
+
+        release?.();
+        const outcomes = await Promise.allSettled(promises);
+        const supersededOutcomes = outcomes.filter((outcome) => outcome.status === "rejected" && outcome.reason instanceof QueueJobSupersededError);
+        expect(supersededOutcomes).toHaveLength(99);
+        expect(queue.count()).toBe(0);
+    });
+
+    it("queueExecuteKey", () => {
+        expect(queueExecuteKey(0x1234, 1, "color")).toStrictEqual({key: 0x1234, supersedeKey: "1:color"});
+        expect(queueExecuteKey(0x1234, 1)).toBe(0x1234);
+        expect(queueExecuteKey(0x1234, 1, undefined, null)).toBeUndefined();
     });
 
     it("Test async mutex", async () => {

@@ -2,7 +2,7 @@
 
 import assert from "node:assert";
 import type * as Models from "../../../models";
-import {Queue, Waitress, wait} from "../../../utils";
+import {Queue, queueExecuteKey, Waitress, wait} from "../../../utils";
 import {logger} from "../../../utils/logger";
 import * as ZSpec from "../../../zspec";
 import * as Zcl from "../../../zspec/zcl";
@@ -327,22 +327,25 @@ export class EZSPAdapter extends Adapter {
         sourceEndpoint?: number,
         profileId?: number,
     ): Promise<ZclPayload | undefined> {
-        return await this.queue.execute<ZclPayload | undefined>(async () => {
-            this.checkInterpanLock();
-            return await this.sendZclFrameToEndpointInternal(
-                ieeeAddr,
-                networkAddress,
-                endpoint,
-                sourceEndpoint || 1,
-                zclFrame,
-                timeout,
-                disableResponse,
-                disableRecovery,
-                0,
-                0,
-                profileId,
-            );
-        }, networkAddress);
+        return await this.queue.execute<ZclPayload | undefined>(
+            async () => {
+                this.checkInterpanLock();
+                return await this.sendZclFrameToEndpointInternal(
+                    ieeeAddr,
+                    networkAddress,
+                    endpoint,
+                    sourceEndpoint || 1,
+                    zclFrame,
+                    timeout,
+                    disableResponse,
+                    disableRecovery,
+                    0,
+                    0,
+                    profileId,
+                );
+            },
+            queueExecuteKey(networkAddress, endpoint, zclFrame.streamType),
+        );
     }
 
     private async sendZclFrameToEndpointInternal(

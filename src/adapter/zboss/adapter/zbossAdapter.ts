@@ -2,7 +2,7 @@
 
 import assert from "node:assert";
 import type {Backup} from "../../../models";
-import {Queue, Waitress} from "../../../utils";
+import {Queue, queueExecuteKey, Waitress} from "../../../utils";
 import {logger} from "../../../utils/logger";
 import * as ZSpec from "../../../zspec";
 import * as Zcl from "../../../zspec/zcl";
@@ -303,25 +303,28 @@ export class ZBOSSAdapter extends Adapter {
         sourceEndpoint?: number,
         profileId?: number,
     ): Promise<ZclPayload | undefined> {
-        return await this.queue.execute<ZclPayload | undefined>(async () => {
-            return await this.sendZclFrameToEndpointInternal(
-                ieeeAddr,
-                networkAddress,
-                endpoint,
-                sourceEndpoint || 1,
-                zclFrame,
-                timeout,
-                disableResponse,
-                disableRecovery,
-                0,
-                0,
-                false,
-                false,
-                false,
-                null,
-                profileId,
-            );
-        }, networkAddress);
+        return await this.queue.execute<ZclPayload | undefined>(
+            async () => {
+                return await this.sendZclFrameToEndpointInternal(
+                    ieeeAddr,
+                    networkAddress,
+                    endpoint,
+                    sourceEndpoint || 1,
+                    zclFrame,
+                    timeout,
+                    disableResponse,
+                    disableRecovery,
+                    0,
+                    0,
+                    false,
+                    false,
+                    false,
+                    null,
+                    profileId,
+                );
+            },
+            queueExecuteKey(networkAddress, endpoint, zclFrame.streamType),
+        );
     }
 
     private async sendZclFrameToEndpointInternal(
