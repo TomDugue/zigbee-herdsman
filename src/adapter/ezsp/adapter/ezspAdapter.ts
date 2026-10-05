@@ -2,7 +2,7 @@
 
 import assert from "node:assert";
 import type * as Models from "../../../models";
-import {Queue, queueExecuteKey, Waitress, wait} from "../../../utils";
+import {Queue, Waitress, wait} from "../../../utils";
 import {logger} from "../../../utils/logger";
 import * as ZSpec from "../../../zspec";
 import * as Zcl from "../../../zspec/zcl";
@@ -11,6 +11,7 @@ import type * as ZdoTypes from "../../../zspec/zdo/definition/tstypes";
 import Adapter, {type ClusterWaitressMatcher, type ZclWaitressPayload} from "../../adapter";
 import type {ZclPayload} from "../../events";
 import type {AdapterOptions, CoordinatorVersion, NetworkOptions, NetworkParameters, SerialPortOptions, StartResult} from "../../tstype";
+import {queueExecuteKey} from "../../utils";
 import {Driver, type EmberIncomingMessage} from "../driver";
 import {EmberEUI64, EmberStatus} from "../driver/types";
 

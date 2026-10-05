@@ -2,6 +2,29 @@ import assert from "node:assert";
 import {existsSync, readFileSync} from "node:fs";
 import {urlToHttpOptions} from "node:url";
 import type * as Models from "../models";
+import type {QueueExecuteOptions} from "../utils/queue";
+import type {ZclStreamType} from "../zspec/zcl";
+
+/**
+ * Queue key for a ZCL send.
+ * A stream type supersedes pending jobs for the same device endpoint. Other sends keep `idleKey` (`null` leaves the job unkeyed).
+ */
+export function queueExecuteKey(
+    networkAddress: number,
+    endpoint: number,
+    streamType?: ZclStreamType,
+    idleKey: number | string | null = networkAddress,
+): number | string | QueueExecuteOptions | undefined {
+    if (streamType) {
+        return {key: networkAddress, supersedeKey: `${endpoint}:${streamType}`};
+    }
+
+    if (idleKey === null) {
+        return undefined;
+    }
+
+    return idleKey;
+}
 
 export function isTcpPath(path: string): boolean {
     try {

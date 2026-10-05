@@ -1,7 +1,7 @@
 /* v8 ignore start */
 
 import type * as Models from "../../../models";
-import {Queue, queueExecuteKey, Waitress, wait} from "../../../utils";
+import {Queue, Waitress, wait} from "../../../utils";
 import {logger} from "../../../utils/logger";
 import * as ZSpec from "../../../zspec";
 import type {BroadcastAddress} from "../../../zspec/enums";
@@ -11,6 +11,7 @@ import type * as ZdoTypes from "../../../zspec/zdo/definition/tstypes";
 import Adapter, {type ClusterWaitressMatcher, type ZclWaitressPayload} from "../../adapter";
 import type * as Events from "../../events";
 import type * as TsType from "../../tstype";
+import {queueExecuteKey} from "../../utils";
 import type {RawAPSDataRequestPayload} from "../driver/commandType";
 import {AddressMode, DeviceType, ZiGateCommandCode, ZiGateMessageCode, ZPSNwkKeyState} from "../driver/constants";
 import type ZiGateObject from "../driver/ziGateObject";

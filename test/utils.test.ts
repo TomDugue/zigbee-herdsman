@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from "vitest";
 import {checkInstallCode} from "../src/controller/helpers/installCodes";
-import {Queue, QueueJobSupersededError, queueExecuteKey, Utils, Waitress, wait} from "../src/utils";
+import {Queue, QueueJobSupersededError, Utils, Waitress, wait} from "../src/utils";
 import {AsyncMutex} from "../src/utils/async-mutex";
 import {logger, setLogger} from "../src/utils/logger";
 
@@ -374,10 +374,99 @@ describe("Utils", () => {
         expect(queue.count()).toBe(0);
     });
 
-    it("queueExecuteKey", () => {
-        expect(queueExecuteKey(0x1234, 1, "color")).toStrictEqual({key: 0x1234, supersedeKey: "1:color"});
-        expect(queueExecuteKey(0x1234, 1)).toBe(0x1234);
-        expect(queueExecuteKey(0x1234, 1, undefined, null)).toBeUndefined();
+    it("Queue supersede does not drop a non-stream job with the same key", async () => {
+        const queue = new Queue(1);
+        const log: string[] = [];
+        let releaseOn: (() => void) | undefined;
+        const onRunning = new Promise<void>((resolve) => {
+            releaseOn = (): void => resolve();
+        });
+
+        const onPromise = queue.execute(async () => {
+            log.push("on");
+            await onRunning;
+        }, 0x1234);
+
+        const pendingOnPromise = queue.execute(async () => {
+            await Promise.resolve();
+            log.push("pendingOn");
+        }, 0x1234);
+
+        const colorPromise = queue.execute(
+            async () => {
+                await Promise.resolve();
+                log.push("color");
+            },
+            {key: 0x1234, supersedeKey: "1:color"},
+        );
+
+        await Promise.resolve();
+        expect(log).toEqual(["on"]);
+        expect(queue.count()).toBe(3);
+
+        releaseOn?.();
+        await onPromise;
+        await pendingOnPromise;
+        await colorPromise;
+        expect(log).toEqual(["on", "pendingOn", "color"]);
+    });
+
+    it("Queue supersede is isolated per endpoint of the same device", async () => {
+        const queue = new Queue(1);
+        const log: string[] = [];
+        let releaseEp1: (() => void) | undefined;
+        const ep1Running = new Promise<void>((resolve) => {
+            releaseEp1 = (): void => resolve();
+        });
+
+        const ep1 = {key: 0x1234, supersedeKey: "1:color"};
+        const ep2 = {key: 0x1234, supersedeKey: "2:color"};
+
+        const ep1Promise = queue.execute(async () => {
+            log.push("ep1");
+            await ep1Running;
+        }, ep1);
+
+        const ep2Promise = queue.execute(async () => {
+            await Promise.resolve();
+            log.push("ep2");
+        }, ep2);
+
+        await Promise.resolve();
+        expect(log).toEqual(["ep1"]);
+        expect(queue.count()).toBe(2);
+
+        releaseEp1?.();
+        await ep1Promise;
+        await ep2Promise;
+        expect(log).toEqual(["ep1", "ep2"]);
+    });
+
+    it("Queue treats numeric key 0 as a real key", async () => {
+        const queue = new Queue(2);
+        const log: number[] = [];
+        let release: (() => void) | undefined;
+        const first = new Promise<void>((resolve) => {
+            release = (): void => resolve();
+        });
+
+        const job0a = queue.execute(async () => {
+            log.push(1);
+            await first;
+        }, 0);
+
+        const job0b = queue.execute(async () => {
+            await Promise.resolve();
+            log.push(2);
+        }, 0);
+
+        await Promise.resolve();
+        expect(log).toEqual([1]);
+
+        release?.();
+        await job0a;
+        await job0b;
+        expect(log).toEqual([1, 2]);
     });
 
     it("Test async mutex", async () => {

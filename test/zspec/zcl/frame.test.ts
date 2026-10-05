@@ -1068,15 +1068,4 @@ describe("ZCL Frame", () => {
             ).toBuffer();
         }).toThrow("Parameter 'manufacturerCode' is missing");
     });
-
-    it("detectStreamType", () => {
-        expect(Zcl.Frame.detectStreamType({colorx: 1, colory: 2})).toBe("color");
-        expect(Zcl.Frame.detectStreamType({hue: 1, saturation: 2, transtime: 0})).toBe("color");
-        expect(Zcl.Frame.detectStreamType({enhancehue: 1})).toBe("color");
-        expect(Zcl.Frame.detectStreamType({colortemp: 250})).toBe("color");
-        expect(Zcl.Frame.detectStreamType({level: 128, transtime: 0})).toBe("brightness");
-        expect(Zcl.Frame.detectStreamType({})).toBeUndefined();
-        expect(Zcl.Frame.detectStreamType([])).toBeUndefined();
-        expect(Zcl.Frame.detectStreamType(null)).toBeUndefined();
-    });
 });

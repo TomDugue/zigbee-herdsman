@@ -14,8 +14,8 @@ type ExecuteKey = string | number | QueueExecuteOptions | undefined;
 interface Job {
     key?: string | number;
     supersedeKey?: string;
+    /** True once this job holds a concurrency slot. Pending jobs stay false so they can be superseded. */
     running: boolean;
-    started: boolean;
     start?: () => void;
     reject?: (error: Error) => void;
 }
@@ -26,23 +26,6 @@ function normalizeExecuteKey(executeKey: ExecuteKey): {key?: string | number; su
     }
 
     return {key: executeKey.key, supersedeKey: executeKey.supersedeKey};
-}
-
-export function queueExecuteKey(
-    networkAddress: number,
-    endpoint: number,
-    streamType?: "color" | "brightness",
-    idleKey: string | number | null = networkAddress,
-): string | number | QueueExecuteOptions | undefined {
-    if (streamType) {
-        return {key: networkAddress, supersedeKey: `${endpoint}:${streamType}`};
-    }
-
-    if (idleKey === null) {
-        return undefined;
-    }
-
-    return idleKey;
 }
 
 export class Queue {
@@ -61,7 +44,7 @@ export class Queue {
             this.#supersedePending(key, supersedeKey);
         }
 
-        const job: Job = {key, supersedeKey, running: false, started: false};
+        const job: Job = {key, supersedeKey, running: false};
         this.#jobs.push(job);
 
         // Minor optimization/workaround: various tests like the idea that a job that is immediately runnable is run without an event loop spin.
@@ -71,7 +54,6 @@ export class Queue {
                 await new Promise<void>((resolve, reject): void => {
                     job.start = (): void => {
                         job.running = true;
-                        job.started = true;
                         this.#running += 1;
                         resolve();
                     };
@@ -81,7 +63,6 @@ export class Queue {
                 });
             } else {
                 job.running = true;
-                job.started = true;
                 this.#running += 1;
             }
 
@@ -93,13 +74,17 @@ export class Queue {
                 this.#jobs.splice(index, 1);
             }
 
-            if (job.started) {
+            if (job.running) {
                 this.#running = Math.max(this.#running - 1, 0);
                 this.#executeNext();
             }
         }
     }
 
+    /**
+     * Drop queued jobs that have not started and share both `key` and `supersedeKey`.
+     * The job already running is left in flight; only later duplicates are rejected.
+     */
     #supersedePending(key: string | number | undefined, supersedeKey: string): void {
         for (let i = this.#jobs.length - 1; i >= 0; i--) {
             const pending = this.#jobs[i];
@@ -109,7 +94,10 @@ export class Queue {
             }
 
             this.#jobs.splice(i, 1);
-            pending.reject?.(new QueueJobSupersededError());
+            const reject = pending.reject;
+            pending.start = undefined;
+            pending.reject = undefined;
+            reject?.(new QueueJobSupersededError());
         }
     }
 
@@ -130,7 +118,8 @@ export class Queue {
         for (let i = 0; i < this.#jobs.length; i++) {
             const job = this.#jobs[i];
 
-            if (!job.running && (!job.key || !this.#jobs.find((j) => j.key === job.key && j.running))) {
+            // `key` 0 is a real destination (coordinator). Only a missing key means "unkeyed".
+            if (!job.running && (job.key === undefined || !this.#jobs.find((j) => j.key === job.key && j.running))) {
                 return job;
             }
         }

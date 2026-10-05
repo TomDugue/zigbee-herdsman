@@ -8,7 +8,7 @@ import {DeconzAdapter} from "../../src/adapter/deconz/adapter/deconzAdapter";
 import {EmberAdapter} from "../../src/adapter/ember/adapter/emberAdapter";
 import {EZSPAdapter} from "../../src/adapter/ezsp/adapter/ezspAdapter";
 import {SerialPort} from "../../src/adapter/serialPort";
-import {parseTcpPath} from "../../src/adapter/utils";
+import {parseTcpPath, queueExecuteKey} from "../../src/adapter/utils";
 import {ZStackAdapter} from "../../src/adapter/z-stack/adapter/zStackAdapter";
 import {ZBOSSAdapter} from "../../src/adapter/zboss/adapter/zbossAdapter";
 import {ZiGateAdapter} from "../../src/adapter/zigate/adapter/zigateAdapter";
@@ -1359,5 +1359,12 @@ describe("Adapter", () => {
                 `USB adapter discovery error (No valid USB adapter found). Specify valid 'adapter' and 'port' in your configuration.`,
             );
         });
+    });
+
+    it("queueExecuteKey", () => {
+        expect(queueExecuteKey(0x1234, 1, "color")).toStrictEqual({key: 0x1234, supersedeKey: "1:color"});
+        expect(queueExecuteKey(0x1234, 1, "brightness")).toStrictEqual({key: 0x1234, supersedeKey: "1:brightness"});
+        expect(queueExecuteKey(0x1234, 1)).toBe(0x1234);
+        expect(queueExecuteKey(0x1234, 1, undefined, null)).toBeUndefined();
     });
 });

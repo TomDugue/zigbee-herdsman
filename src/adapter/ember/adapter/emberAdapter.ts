@@ -4,7 +4,7 @@ import path from "node:path";
 
 import equals from "fast-deep-equal/es6";
 import type {Backup} from "../../../models";
-import {BackupUtils, Queue, queueExecuteKey, wait} from "../../../utils";
+import {BackupUtils, Queue, wait} from "../../../utils";
 import {logger} from "../../../utils/logger";
 import * as ZSpec from "../../../zspec";
 import type {Eui64, ExtendedPanId, NodeId, PanId} from "../../../zspec/tstypes";
@@ -14,7 +14,7 @@ import type * as ZdoTypes from "../../../zspec/zdo/definition/tstypes";
 import {Adapter, type TsType} from "../..";
 import {WORKAROUND_JOIN_MANUF_IEEE_PREFIX_TO_CODE} from "../../const";
 import type {DeviceJoinedPayload, DeviceLeavePayload, ZclPayload} from "../../events";
-import {readBackup} from "../../utils";
+import {queueExecuteKey, readBackup} from "../../utils";
 import {
     EMBER_HIGH_RAM_CONCENTRATOR,
     EMBER_LOW_RAM_CONCENTRATOR,

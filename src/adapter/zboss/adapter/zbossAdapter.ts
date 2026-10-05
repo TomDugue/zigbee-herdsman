@@ -2,7 +2,7 @@
 
 import assert from "node:assert";
 import type {Backup} from "../../../models";
-import {Queue, queueExecuteKey, Waitress} from "../../../utils";
+import {Queue, Waitress} from "../../../utils";
 import {logger} from "../../../utils/logger";
 import * as ZSpec from "../../../zspec";
 import * as Zcl from "../../../zspec/zcl";
@@ -12,6 +12,7 @@ import {Adapter, type ClusterWaitressMatcher, type ZclWaitressPayload} from "../
 import {WORKAROUND_JOIN_MANUF_IEEE_PREFIX_TO_CODE} from "../../const";
 import type {ZclPayload} from "../../events";
 import type {AdapterOptions, CoordinatorVersion, NetworkOptions, NetworkParameters, SerialPortOptions, StartResult} from "../../tstype";
+import {queueExecuteKey} from "../../utils";
 import {ZBOSSDriver} from "../driver";
 import {CommandId, DeviceUpdateStatus} from "../enums";
 import {FrameType, type ZBOSSFrame} from "../frame";

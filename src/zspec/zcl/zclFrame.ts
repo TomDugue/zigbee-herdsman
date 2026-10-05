@@ -29,6 +29,7 @@ export class ZclFrame {
     public readonly payload: ZclPayload;
     public readonly cluster: Cluster;
     public readonly command: Command | FoundationDefinition;
+    /** Adapter-queue hint for coalescing pending color or brightness sends. Not serialized. */
     public streamType?: ZclStreamType;
 
     private constructor(header: ZclHeader, payload: ZclPayload, cluster: Cluster, command: Command | FoundationDefinition) {
@@ -263,24 +264,6 @@ export class ZclFrame {
         commandName: FoundationCommandName | "remove" | "add" | "write" | "enrollReq" | "checkin" | "getAlarm" | "arm" | "queryNextImageRequest",
     ): boolean {
         return this.command.name === commandName;
-    }
-
-    public static detectStreamType(payload: unknown): ZclStreamType | undefined {
-        if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
-            return undefined;
-        }
-
-        const entry = payload as Record<string, unknown>;
-
-        if ("level" in entry) {
-            return "brightness";
-        }
-
-        if (("colorx" in entry && "colory" in entry) || "enhancehue" in entry || "hue" in entry || "saturation" in entry || "colortemp" in entry) {
-            return "color";
-        }
-
-        return undefined;
     }
 }
 

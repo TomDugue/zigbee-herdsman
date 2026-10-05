@@ -13,6 +13,7 @@ import * as Zdo from "../../zspec/zdo";
 import Request from "../helpers/request";
 import RequestQueue from "../helpers/requestQueue";
 import * as ZclFrameConverter from "../helpers/zclFrameConverter";
+import {applyZclStreamType} from "../helpers/zclStream";
 import zclTransactionSequenceNumber from "../helpers/zclTransactionSequenceNumber";
 import type {
     ClusterOrRawAttributeKeys,
@@ -1186,13 +1187,7 @@ export class Endpoint extends ZigbeeEntity {
             optionsWithDefaults.reservedBits,
         );
 
-        if (options?.streamType !== false) {
-            const streamType = options?.streamType ?? Zcl.Frame.detectStreamType(payload);
-
-            if (streamType) {
-                frame.streamType = streamType;
-            }
-        }
+        applyZclStreamType(frame, cluster, command, options?.streamType);
 
         const createLogMessage = (): string =>
             `ZCL command ${this.deviceIeeeAddress}/${this.ID} ` +

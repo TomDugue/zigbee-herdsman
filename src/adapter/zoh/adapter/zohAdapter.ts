@@ -8,7 +8,7 @@ import type {ZigbeeAPSHeader, ZigbeeAPSPayload} from "zigbee-on-host/dist/zigbee
 import type {ZigbeeNWKGPHeader} from "zigbee-on-host/dist/zigbee/zigbee-nwkgp";
 import type {Backup} from "../../../models/backup";
 import {logger} from "../../../utils/logger";
-import {Queue, queueExecuteKey} from "../../../utils/queue";
+import {Queue} from "../../../utils/queue";
 import {wait} from "../../../utils/wait";
 import {Waitress} from "../../../utils/waitress";
 import * as ZSpec from "../../../zspec";
@@ -19,7 +19,7 @@ import {Adapter, type ClusterWaitressMatcher, type ZclWaitressPayload} from "../
 import type {ZclPayload} from "../../events";
 import {SerialPort} from "../../serialPort";
 import type * as TsType from "../../tstype";
-import {isTcpPath} from "../../utils";
+import {isTcpPath, queueExecuteKey} from "../../utils";
 import {bigUInt64ToHexBE} from "./utils";
 
 const NS = "zh:zoh";

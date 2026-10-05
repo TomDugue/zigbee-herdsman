@@ -1451,18 +1451,12 @@ vi.mock("../../../src/adapter/z-stack/znp/znp", () => ({
     })),
 }));
 
-vi.mock("../../../src/utils/queue", async (importOriginal) => {
-    const actual = await importOriginal<typeof import("../../../src/utils/queue")>();
-
-    return {
-        Queue: vi.fn(() => ({
-            execute: mockQueueExecute,
-            count: () => 1,
-        })),
-        QueueJobSupersededError: actual.QueueJobSupersededError,
-        queueExecuteKey: actual.queueExecuteKey,
-    };
-});
+vi.mock("../../../src/utils/queue", () => ({
+    Queue: vi.fn(() => ({
+        execute: mockQueueExecute,
+        count: () => 1,
+    })),
+}));
 
 const mocksClear = [mockLogger.debug, mockLogger.info, mockLogger.warning, mockLogger.error];
 
@@ -2340,6 +2334,26 @@ describe("zstack-adapter", () => {
             {clusterid: 0, data: frame.toBuffer(), destendpoint: 20, dstaddr: 2, len: 6, options: 0, radius: 30, srcendpoint: 1, transid: 1},
             99,
         );
+    });
+
+    it("Send zcl stream frame uses supersede queue key", async () => {
+        basicMocks();
+        await adapter.start();
+        mockQueueExecute.mockClear();
+        const frame = Zcl.Frame.create(
+            Zcl.FrameType.GLOBAL,
+            Zcl.Direction.CLIENT_TO_SERVER,
+            true,
+            undefined,
+            100,
+            "writeNoRsp",
+            0,
+            [{attrId: 0, dataType: 0, attrData: null}],
+            {},
+        );
+        frame.streamType = "brightness";
+        await adapter.sendZclFrameToEndpoint("0x02", 2, 20, frame, 10000, false, false);
+        expect(mockQueueExecute.mock.calls[0][1]).toStrictEqual({key: 2, supersedeKey: "20:brightness"});
     });
 
     it("Send zcl frame with APS encryption", async () => {
